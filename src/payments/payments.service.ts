@@ -1,17 +1,18 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { PaymentSessionDto } from './dto/create-payment.dto';
 import Stripe from 'stripe';
-import { envs } from 'src/config';
+import { envs, NATS_SERVICE } from 'src/config';
 import { error } from 'console';
-import { RpcException } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { Request, Response } from 'express';
 
 @Injectable()
 export class PaymentsService {
   private readonly stripe = new Stripe(envs.stripe_secret_clave);
-
+  constructor(@Inject(NATS_SERVICE) private readonly client: ClientProxy) {}
   async createPaymentSession(paymentSessionDto: PaymentSessionDto) {
     try {
-      const { currency, items } = paymentSessionDto;
+      const { currency, items, orderId } = paymentSessionDto;
 
       const lineItemms = items.map((item) => ({
         price_data: {
@@ -26,7 +27,9 @@ export class PaymentsService {
       }));
       const session = await this.stripe.checkout.sessions.create({
         payment_intent_data: {
-          metadata: {},
+          metadata: {
+            orderId: orderId,
+          },
         },
         line_items: lineItemms,
         mode: 'payment',
@@ -45,5 +48,39 @@ export class PaymentsService {
         message: `Error:  ${erorr}`,
       });
     }
+  }
+
+  stripeWebhook(res: Response, req: Request) {
+    const sig = req.headers['stripe-signature'];
+    const endPoint = envs.webhook_stripe;
+    let event: Stripe.Event;
+
+    try {
+      event = this.stripe.webhooks.constructEvent(
+        req['rawBody'],
+        sig,
+        endPoint,
+      );
+    } catch (error) {
+      throw new RpcException({
+        status: HttpStatus.BAD_REQUEST,
+        message: `Webhook error ${error}`,
+      });
+    }
+
+    switch (event.type) {
+      case 'charge.succeeded':
+        const chargeSucced = event.data.object;
+        const payload = {
+          stripePaymentId: chargeSucced.id,
+          orderId: chargeSucced.metadata.orderId,
+        };
+        this.client.emit('payment.succeded', payload);
+        break;
+
+      default:
+        console.log(`Evento tipo ${event.type}`);
+    }
+    return res.status(200).json({ sig });
   }
 }
