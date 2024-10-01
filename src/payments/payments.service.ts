@@ -73,9 +73,10 @@ export class PaymentsService {
         const chargeSucced = event.data.object;
         const payload = {
           stripePaymentId: chargeSucced.id,
-          orderId: chargeSucced.metadata.orderId,
+          orderId: +chargeSucced.metadata.orderId,
         };
         console.log(payload);
+
         this.client.emit('payment.succeded', payload);
         break;
 
