@@ -76,7 +76,7 @@ export class PaymentsService {
           orderId: chargeSucced.metadata.orderId,
         };
         console.log(payload);
-        // this.client.emit('payment.succeded', payload);
+        this.client.emit('payment.succeded', payload);
         break;
 
       default:
