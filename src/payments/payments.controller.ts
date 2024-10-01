@@ -29,7 +29,8 @@ export class PaymentsController {
   }
 
   @Post('webhook')
-  webhook(@Res() response: Response, @Req() request: Request) {
-    return this.paymentsService.stripeWebhook(response, request);
+  webhook(@Req() req: Request, @Res() res: Response) {
+    console.log(req.headers);
+    return this.paymentsService.stripeWebhook(req, res);
   }
 }

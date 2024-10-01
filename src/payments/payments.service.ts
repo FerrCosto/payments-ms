@@ -50,11 +50,11 @@ export class PaymentsService {
     }
   }
 
-  stripeWebhook(res: Response, req: Request) {
+  stripeWebhook(req: Request, res: Response) {
     const sig = req.headers['stripe-signature'];
     const endPoint = envs.webhook_stripe;
     let event: Stripe.Event;
-
+    console.log(endPoint);
     try {
       event = this.stripe.webhooks.constructEvent(
         req['rawBody'],
@@ -75,7 +75,8 @@ export class PaymentsService {
           stripePaymentId: chargeSucced.id,
           orderId: chargeSucced.metadata.orderId,
         };
-        this.client.emit('payment.succeded', payload);
+        console.log(payload);
+        // this.client.emit('payment.succeded', payload);
         break;
 
       default:
